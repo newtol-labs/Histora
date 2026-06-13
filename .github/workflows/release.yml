@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # Opt into Node.js 24 for JS actions (Node 20 deprecated on runners).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build-mac:
     name: Build macOS
@@ -106,14 +110,27 @@ jobs:
           STAGING="$WORK/staging"
           mkdir -p "$STAGING"
 
-          # Copy everything from the original DMG volume (background, symlink, etc.)
-          # except the old Histora.app, then place the re-signed app.
+          # Copy DMG volume contents EXCEPT the old app and the Applications
+          # symlink. CRITICAL: the Applications entry is a symlink → /Applications;
+          # following it (ditto without -L handling) would recurse the runner's
+          # entire /Applications (Xcode, etc.) and corrupt the image. We handle
+          # symlinks explicitly and recreate the Applications link ourselves.
           find "$MOUNT" -mindepth 1 -maxdepth 1 | while read item; do
             name=$(basename "$item")
-            if [ "$name" != "Histora.app" ]; then
+            [ "$name" = "Histora.app" ] && continue
+            [ "$name" = "Applications" ] && continue
+            if [ -L "$item" ]; then
+              # preserve any other symlink as-is (do not follow)
+              cp -R "$item" "$STAGING/$name"
+            else
               ditto "$item" "$STAGING/$name" 2>/dev/null || cp -a "$item" "$STAGING/$name" 2>/dev/null || true
             fi
           done
+
+          # Recreate the /Applications drag-target symlink
+          ln -s /Applications "$STAGING/Applications"
+
+          # Place the re-signed app
           ditto "$APP" "$STAGING/Histora.app"
 
           hdiutil detach "$MOUNT" -quiet

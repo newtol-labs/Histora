@@ -32,28 +32,30 @@ jobs:
       - name: Strip ad-hoc signatures and repack dmg
         # Electron pre-built binaries carry an adhoc signature with
         # Info.plist=not-bound. Gatekeeper treats such apps as "damaged"
-        # (cannot open at all). We must strip ALL signatures so the app
-        # shows "unknown developer" instead — users can bypass with
-        # right-click → Open, or: xattr -cr /Applications/Histora.app
+        # (cannot open at all). Fully unsigned apps show "unknown developer"
+        # which users bypass with right-click → Open (or xattr -cr).
         #
-        # electron-builder re-runs packaging when called a second time, so
-        # we must post-process the already-built dmg: mount → strip → repack.
+        # Strategy: mount the electron-builder DMG, strip signatures IN PLACE
+        # inside the mounted volume, then convert the live volume back to a
+        # compressed image — this preserves the background image, Applications
+        # symlink, DS_Store icon positions, and VolumeIcon set by electron-builder.
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           DMG="release/Histora-${VERSION}-arm64.dmg"
           ZIP="release/Histora-${VERSION}-arm64-mac.zip"
           WORK="$(mktemp -d)"
+          MOUNT="$WORK/mnt"
+          mkdir -p "$MOUNT"
 
-          echo "→ Mounting $DMG"
-          hdiutil attach "$DMG" -nobrowse -mountpoint "$WORK/mnt" -quiet
+          # ── 1. Convert compressed dmg → read-write shadow so we can modify it ──
+          SHADOW="$WORK/shadow.dmg"
+          hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT" \
+            -shadow "$SHADOW" -quiet
 
-          echo "→ Copying app"
-          ditto "$WORK/mnt/Histora.app" "$WORK/Histora.app"
-          hdiutil detach "$WORK/mnt" -quiet
-
+          # ── 2. Strip ALL ad-hoc signatures from the .app in the mounted volume ──
           echo "→ Stripping signatures"
-          find "$WORK/Histora.app" \( \
+          find "$MOUNT/Histora.app" \( \
             -name "*.app" -o -name "*.dylib" -o \
             -name "*.so"  -o -name "*.node"  -o \
             -name "Histora" -o -name "Electron*" \) \
@@ -61,17 +63,23 @@ jobs:
                 codesign --remove-signature "$f" 2>/dev/null || true
               done
 
-          echo "→ Repacking dmg"
-          rm -f "$DMG"
-          hdiutil create \
-            -volname "Histora ${VERSION}-arm64" \
-            -srcfolder "$WORK/Histora.app" \
-            -ov -format UDZO \
-            "$DMG"
+          # ── 3. Detach ──────────────────────────────────────────────────────────
+          hdiutil detach "$MOUNT" -quiet
 
+          # ── 4. Merge shadow + original → new compressed dmg ────────────────────
+          echo "→ Repacking dmg (preserving background + Applications link)"
+          ORIG_DMG="$DMG"
+          hdiutil convert "$ORIG_DMG" -format UDZO \
+            -shadow "$SHADOW" -o "$WORK/out.dmg" 2>&1 | tail -3
+          rm -f "$DMG"
+          mv "$WORK/out.dmg" "$DMG"
+
+          # ── 5. Repack zip from the unsigned app (extract from new dmg) ─────────
           echo "→ Repacking zip"
+          hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT" -quiet
           rm -f "$ZIP"
-          ditto -c -k --sequesterRsrc --keepParent "$WORK/Histora.app" "$ZIP"
+          ditto -c -k --sequesterRsrc --keepParent "$MOUNT/Histora.app" "$ZIP"
+          hdiutil detach "$MOUNT" -quiet
 
           rm -rf "$WORK"
           echo "→ Regenerating latest-mac.yml with correct checksums"

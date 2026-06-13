@@ -1,6 +1,6 @@
 {
   "name": "histora",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "author": "Jet",
@@ -60,6 +60,29 @@
         "dmg",
         "zip"
       ]
+    },
+    "dmg": {
+      "background": "build/dmg-background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "iconSize": 120,
+      "iconTextSize": 14,
+      "contents": [
+        {
+          "x": 135,
+          "y": 210,
+          "type": "file"
+        },
+        {
+          "x": 405,
+          "y": 210,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "sign": false
     },
     "win": {
       "target": [

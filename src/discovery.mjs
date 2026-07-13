@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { defaultCodexHome } from "./codex-storage.mjs";
 import { displayPath, expandHome } from "./utils.mjs";
 
 export function detectAgents(config = {}) {
@@ -59,12 +60,12 @@ function agentDefinitions() {
   return [
     {
       id: "codex",
-      label: "Codex",
-      client: "CLI/Desktop",
+      label: "ChatGPT Codex",
+      client: "ChatGPT Desktop/CLI",
       adapter: "codex-jsonl",
       commands: ["codex"],
-      apps: macApps("Codex.app"),
-      sources: ["~/.codex/sessions"]
+      apps: macApps("ChatGPT.app", "Codex.app"),
+      sources: [defaultCodexHome()]
     },
     {
       id: "claude-code",

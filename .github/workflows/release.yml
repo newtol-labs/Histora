@@ -63,6 +63,7 @@ jobs:
           APP="$APPDIR/Histora.app"
           PLIST="$APP/Contents/Info.plist"
           ASAR="$APP/Contents/Resources/app.asar"
+          ENTITLEMENTS="$GITHUB_WORKSPACE/build/entitlements.mac.plist"
 
           # ── 3. Re-sign bottom-up ──────────────────────────────────────────────
           # CRITICAL: delete ALL old _CodeSignature dirs first. Otherwise
@@ -98,11 +99,11 @@ jobs:
           find "$APP/Contents/Frameworks" -name "*.app" -print \
             | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2- \
             | while IFS= read -r f; do
-                codesign --sign - --force "$f" 2>/dev/null || true
+                codesign --sign - --force --entitlements "$ENTITLEMENTS" "$f"
               done
 
           # e) Main executable
-          codesign --sign - --force "$APP/Contents/MacOS/Histora" 2>/dev/null || true
+          codesign --sign - --force --entitlements "$ENTITLEMENTS" "$APP/Contents/MacOS/Histora"
 
           # f) Fix ElectronAsarIntegrity — Electron 33+ validates asar SHA256 on launch
           echo "→ Updating ASAR integrity hash"
@@ -117,12 +118,14 @@ jobs:
           "
 
           # g) Top-level bundle must be signed last
-          codesign --sign - --force "$APP" 2>/dev/null || true
+          codesign --sign - --force --entitlements "$ENTITLEMENTS" "$APP"
 
           # ── Verify the FULL chain before packaging (fail the build if broken) ──
           echo "→ Verifying signature integrity"
           codesign --verify --deep --verbose=2 "$APP" 2>&1 | tail -3
           codesign -dv "$APP/Contents/Frameworks/Electron Framework.framework" 2>&1 | grep flags || true
+          codesign -d --entitlements :- "$APP" 2>&1 \
+            | grep -q "com.apple.security.files.user-selected.read-write"
 
           # ── 4. Repack DMG: copy volume contents + swap in re-signed app ────────
           echo "→ Repacking DMG"

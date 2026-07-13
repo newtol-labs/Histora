@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { adapter as codexJsonlAdapter } from "./adapters/codex-jsonl.mjs";
 import { adapter as geminiJsonAdapter } from "./adapters/gemini-json.mjs";
 import { adapter as hermesSqliteAdapter } from "./adapters/hermes-sqlite.mjs";
 import { adapter as openclawJsonAdapter } from "./adapters/openclaw-json.mjs";
@@ -107,6 +108,47 @@ assert.equal(updatedConfig.sync.schedule, "07:05");
 const state = ensureState(tempRoot);
 assert.ok(fs.existsSync(state.db));
 
+const codexHome = path.join(tempRoot, ".codex");
+const activeCodexDir = path.join(codexHome, "sessions", "2026", "07", "14");
+const archivedCodexDir = path.join(codexHome, "archived_sessions");
+const relocatedCodexDir = path.join(codexHome, "relocated_threads");
+fs.mkdirSync(activeCodexDir, { recursive: true });
+fs.mkdirSync(archivedCodexDir, { recursive: true });
+fs.mkdirSync(relocatedCodexDir, { recursive: true });
+writeCodexSession(path.join(activeCodexDir, "active.jsonl"), "codex-active", "Active Codex task");
+writeCodexSession(path.join(archivedCodexDir, "archived.jsonl"), "codex-archived", "Archived Codex task");
+const relocatedCodexPath = path.join(relocatedCodexDir, "relocated.jsonl");
+writeCodexSession(relocatedCodexPath, "codex-relocated", "Relocated Codex task");
+const codexIndexDir = path.join(codexHome, "sqlite");
+const codexIndex = path.join(codexIndexDir, "state_5.sqlite");
+fs.mkdirSync(codexIndexDir, { recursive: true });
+execFileSync("sqlite3", [codexIndex, `create table threads (rollout_path text); insert into threads values ('${relocatedCodexPath}');`]);
+
+const codexHomeRecords = codexJsonlAdapter.discover({
+  id: "codex",
+  label: "ChatGPT Codex",
+  client: "ChatGPT Desktop/CLI",
+  source: codexHome
+});
+assert.deepEqual(codexHomeRecords.map((record) => record.sessionId).sort(), [
+  "codex-active",
+  "codex-archived",
+  "codex-relocated"
+]);
+assert.ok(codexHomeRecords.every((record) => record.adapterVersion === "codex-jsonl-v2"));
+
+const legacyCodexRecords = codexJsonlAdapter.discover({
+  id: "codex",
+  label: "Codex",
+  client: "CLI/Desktop",
+  source: path.join(codexHome, "sessions")
+});
+assert.deepEqual(legacyCodexRecords.map((record) => record.sessionId).sort(), [
+  "codex-active",
+  "codex-archived",
+  "codex-relocated"
+]);
+
 const geminiExportPath = path.join(tempRoot, "gemini-export.json");
 fs.writeFileSync(
   geminiExportPath,
@@ -194,3 +236,27 @@ const detected = detectAgents({ channels: [{ id: "hermes-agent", source: hermesD
 assert.ok(detected.some((agent) => agent.id === "hermes-agent"));
 
 console.log("ok");
+
+function writeCodexSession(filePath, id, title) {
+  fs.writeFileSync(
+    filePath,
+    [
+      JSON.stringify({
+        timestamp: "2026-07-14T00:00:00.000Z",
+        type: "session_meta",
+        payload: { id, cwd: "/tmp/codex-project", cli_version: "0.144.2" }
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-14T00:00:01.000Z",
+        type: "response_item",
+        payload: { type: "message", role: "user", content: [{ type: "input_text", text: title }] }
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-14T00:00:02.000Z",
+        type: "response_item",
+        payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "Done" }] }
+      })
+    ].join("\n"),
+    "utf8"
+  );
+}

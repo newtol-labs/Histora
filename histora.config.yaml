@@ -9,10 +9,10 @@ sync:
 
 channels:
   - id: codex
-    label: Codex
-    client: CLI/Desktop
+    label: "ChatGPT Codex"
+    client: "ChatGPT Desktop/CLI"
     adapter: codex-jsonl
-    source: ~/.codex/sessions
+    source: ~/.codex
     enabled: true
   - id: claude-code
     label: "Claude Code"

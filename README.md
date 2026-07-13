@@ -71,7 +71,7 @@ Histora checks installed agents on startup and status refresh. The GUI shows com
 
 Currently supported direct sources:
 
-- Codex: `~/.codex/sessions`
+- ChatGPT Codex and Codex CLI: `CODEX_HOME` (normally `~/.codex`), including active sessions in `sessions/` and archived sessions in `archived_sessions/`
 - Claude Code: `~/.claude/projects`
 - OpenCode: `~/.local/share/opencode/opencode.db`
 - Hermes Agent: `~/.hermes/state.db`

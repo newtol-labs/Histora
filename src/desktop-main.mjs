@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, Menu, shell } from "electron";
+import { defaultCodexHome } from "./codex-storage.mjs";
 import { CONFIG_FILE, LEGACY_CONFIG_FILE, renderConfig } from "./config.mjs";
 import { runSync } from "./sync.mjs";
 import { ensureDir } from "./utils.mjs";
@@ -204,10 +205,10 @@ function defaultConfig(workspaceRoot) {
     channels: [
       {
         id: "codex",
-        label: "Codex",
-        client: "CLI/Desktop",
+        label: "ChatGPT Codex",
+        client: "ChatGPT Desktop/CLI",
         adapter: "codex-jsonl",
-        source: "~/.codex/sessions",
+        source: defaultCodexHome(),
         enabled: true
       },
       {

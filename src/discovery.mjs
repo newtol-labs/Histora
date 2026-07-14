@@ -77,6 +77,16 @@ function agentDefinitions() {
       sources: ["~/.claude/projects"]
     },
     {
+      id: "claude-desktop",
+      label: "Claude Desktop (Export)",
+      client: "Desktop export",
+      adapter: "claude-export-json",
+      apps: macApps("Claude.app"),
+      sources: [],
+      noteWhenInstalledWithoutSource:
+        "Claude Desktop 会话应通过导出文件导入 / Import Claude Desktop sessions from an export file."
+    },
+    {
       id: "opencode",
       label: "OpenCode",
       client: "CLI",
@@ -110,6 +120,89 @@ function agentDefinitions() {
       commands: ["hermes"],
       apps: macApps("Hermes.app"),
       sources: ["~/.hermes/state.db"]
+    },
+    {
+      id: "grok-cli",
+      label: "Grok CLI",
+      client: "CLI",
+      adapter: "grok-jsonl",
+      commands: ["grok"],
+      sources: ["~/.grok/sessions"]
+    },
+    {
+      id: "accio-work",
+      label: "Accio Work",
+      client: "Desktop",
+      adapter: "accio-jsonl",
+      apps: macApps("Accio.app"),
+      sources: ["~/.accio/accounts"]
+    },
+    {
+      id: "workbuddy",
+      label: "WorkBuddy",
+      client: "Desktop",
+      adapter: "workbuddy-jsonl",
+      apps: macApps("WorkBuddy.app", "Workbuddy.app"),
+      sources: ["~/.workbuddy"]
+    },
+    {
+      id: "zcode",
+      label: "ZCode",
+      client: "Desktop/CLI",
+      adapter: "zcode-sqlite",
+      apps: macApps("ZCode.app"),
+      commands: ["zcode"],
+      sources: ["~/.zcode/cli/db/db.sqlite"]
+    },
+    {
+      id: "kimi-code",
+      label: "Kimi Code",
+      client: "CLI",
+      adapter: "kimi-jsonl",
+      commands: ["kimi"],
+      sources: ["~/.kimi-code/sessions", "~/.kimi/sessions"]
+    },
+    {
+      id: "mimo-code",
+      label: "Mimo Code",
+      client: "CLI",
+      adapter: "mimo-sqlite",
+      commands: ["mimo"],
+      sources: ["~/.local/share/mimocode/mimocode.db"]
+    },
+    {
+      id: "qoder-cli",
+      label: "Qoder CLI",
+      client: "CLI",
+      adapter: "qoder-jsonl",
+      commands: ["qodercli", "qoder"],
+      sources: ["~/.qoder/projects"]
+    },
+    {
+      id: "qoder-work",
+      label: "Qoder Work",
+      client: "Desktop",
+      adapter: "qoderwork-sqlite",
+      apps: macApps("QoderWork.app"),
+      sources: ["~/Library/Application Support/QoderWork/data/agents.db"]
+    },
+    {
+      id: "trae",
+      label: "Trae",
+      client: "Desktop",
+      adapter: "trae-vscode-json",
+      apps: macApps("Trae CN.app", "TRAE SOLO.app", "Trae.app"),
+      sources: ["~/Library/Application Support/Trae CN", "~/Library/Application Support/TRAE SOLO"]
+    },
+    {
+      id: "minimax-cli",
+      label: "MiniMax CLI (Import)",
+      client: "CLI export",
+      adapter: "minimax-export-json",
+      commands: ["mmx"],
+      sources: [],
+      noteWhenInstalledWithoutSource:
+        "MiniMax CLI 已安装；当前版本未提供可自动读取的本地会话库，请配置导出的 JSON/JSONL 文件。"
     }
   ];
 }

@@ -14,12 +14,13 @@ export function launchdPlistPath() {
   return path.join(os.homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
 }
 
-export function installLaunchd(root = process.cwd()) {
+export function installLaunchd(root = process.cwd(), options = {}) {
+  assertSafeBackgroundWorkspace(root);
   const config = readConfig(root);
   const [hour, minute] = String(config.sync.schedule || "23:00").split(":").map(Number);
   const cadence = config.sync.cadence === "interval" ? "interval" : "daily";
   const intervalMinutes = normalizeSchedulerInterval(config.sync.interval_minutes);
-  const runner = launchdRunner(root);
+  const runner = launchdRunner(root, options);
 
   if (process.platform === "win32") {
     return installWindowsTask(root, config, runner, {
@@ -110,13 +111,35 @@ function installWindowsTask(root, config, runner, schedule) {
   };
 }
 
-function launchdRunner(root) {
+export function assertSafeBackgroundWorkspace(root) {
+  if (process.platform !== "darwin") return;
+  const protectedRoots = ["Documents", "Desktop", "Downloads"].map((name) => path.join(os.homedir(), name));
+  const resolvedRoot = path.resolve(root);
+  if (protectedRoots.some((protectedRoot) => isDescendantOf(resolvedRoot, protectedRoot))) {
+    throw new Error(
+      "Background sync cannot use Documents, Desktop, or Downloads as its workspace. Move Histora data to Application Support first."
+    );
+  }
+}
+
+export function launchdRunner(root, options = {}) {
+  if (options.runner) {
+    const runner = {
+      programArguments: [...(options.runner.programArguments || [])],
+      environment: { ...(options.runner.environment || {}), HISTORA_WORKSPACE: root }
+    };
+    assertSafeMacAppRunner(runner);
+    return runner;
+  }
   const cliPath = path.join(root, "src", "cli.mjs");
   const environment = {
     HISTORA_WORKSPACE: root
   };
 
-  if (process.versions.electron || !fs.existsSync(cliPath)) {
+  if (process.versions.electron) {
+    throw new Error("Background scheduling from a development Electron build is not supported. Install Histora in Applications first.");
+  }
+  if (!fs.existsSync(cliPath)) {
     return {
       programArguments: [process.execPath, "--histora-sync"],
       environment
@@ -127,6 +150,20 @@ function launchdRunner(root) {
     programArguments: [process.execPath, cliPath, "sync"],
     environment
   };
+}
+
+function assertSafeMacAppRunner(runner) {
+  if (process.platform !== "darwin" || runner.programArguments[1] !== "--histora-sync") return;
+  const executable = path.resolve(runner.programArguments[0] || "");
+  const applications = ["/Applications", path.join(os.homedir(), "Applications")];
+  if (!applications.some((directory) => isDescendantOf(executable, directory))) {
+    throw new Error("Background sync must run the installed Histora.app from Applications, not a build artifact.");
+  }
+}
+
+function isDescendantOf(candidate, parent) {
+  const relative = path.relative(parent, candidate);
+  return relative === "" || (relative && !relative.startsWith(`..${path.sep}`) && relative !== "..");
 }
 
 function normalizeSchedulerInterval(value) {

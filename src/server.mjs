@@ -12,12 +12,13 @@ export function createChathubServer(options = {}) {
   const root = options.root || process.cwd();
   const publicDir = options.publicDir || path.join(root, "public");
   const updater = options.updater || null;
+  const schedulerOptions = options.schedulerOptions || {};
 
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname.startsWith("/api/")) {
-        await handleApi(req, res, url, root, updater);
+        await handleApi(req, res, url, root, updater, schedulerOptions);
         return;
       }
       serveStatic(res, url.pathname, publicDir);
@@ -46,7 +47,7 @@ export function startServer(options = {}) {
   });
 }
 
-async function handleApi(req, res, url, root, updater) {
+async function handleApi(req, res, url, root, updater, schedulerOptions) {
   if (req.method === "GET" && url.pathname === "/api/status") {
     sendJson(res, 200, getStatus(root));
     return;
@@ -110,7 +111,7 @@ async function handleApi(req, res, url, root, updater) {
       interval_minutes: body.intervalMinutes,
       schedule: body.schedule
     });
-    const launchd = installLaunchd(root);
+    const launchd = installLaunchd(root, schedulerOptions);
     sendJson(res, 200, { config, launchd });
     return;
   }
@@ -123,7 +124,7 @@ async function handleApi(req, res, url, root, updater) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/install-launchd") {
-    sendJson(res, 200, installLaunchd(root));
+    sendJson(res, 200, installLaunchd(root, schedulerOptions));
     return;
   }
 

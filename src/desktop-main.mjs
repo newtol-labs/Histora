@@ -2,11 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, Menu, shell } from "electron";
 import { defaultCodexHome } from "./codex-storage.mjs";
-import { CONFIG_FILE, LEGACY_CONFIG_FILE, renderConfig } from "./config.mjs";
+import { CONFIG_FILE, LEGACY_CONFIG_FILE, readConfig, renderConfig } from "./config.mjs";
+import { installLaunchd, launchdPlistPath } from "./launchd.mjs";
 import { runSync } from "./sync.mjs";
 import { ensureDir } from "./utils.mjs";
 import { startServer } from "./server.mjs";
 import { createUpdater } from "./updater.mjs";
+import { hasWorkspaceConfig, managedWorkspaceRoot, migrateWorkspace } from "./workspace.mjs";
 
 const isSyncOnly = process.argv.includes("--histora-sync") || process.argv.includes("--chathub-sync");
 
@@ -42,14 +44,20 @@ if (isSyncOnly) {
   });
 
   app.whenReady().then(async () => {
-    const workspaceRoot = resolveWorkspaceRoot();
+    const workspace = resolveWorkspace();
+    const workspaceRoot = workspace.root;
     ensureDesktopWorkspace(workspaceRoot);
+    const schedulerOptions = desktopSchedulerOptions();
+    if (workspace.migrated && app.isPackaged && fs.existsSync(launchdPlistPath())) {
+      installLaunchd(workspaceRoot, schedulerOptions);
+    }
     updater = createUpdater({ app, shell, isPackaged: app.isPackaged });
     serverHandle = await startServer({
       root: workspaceRoot,
       publicDir: path.join(app.getAppPath(), "public"),
       port: 0,
-      updater
+      updater,
+      schedulerOptions
     });
 
     openMainWindow();
@@ -82,7 +90,7 @@ async function runSyncOnly() {
   timer.unref?.();
 
   try {
-    const workspaceRoot = resolveWorkspaceRoot();
+    const workspaceRoot = resolveWorkspace().root;
     console.log(`[Histora sync] start ${new Date().toISOString()} root=${workspaceRoot}`);
     ensureDesktopWorkspace(workspaceRoot);
     const run = await runSync({ root: workspaceRoot });
@@ -160,36 +168,48 @@ function setApplicationMenu(window, workspaceRoot, updater) {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function resolveWorkspaceRoot() {
-  if (process.env.HISTORA_WORKSPACE) return path.resolve(process.env.HISTORA_WORKSPACE);
-  if (process.env.CHATHUB_WORKSPACE) return path.resolve(process.env.CHATHUB_WORKSPACE);
-  if (app.isPackaged) return resolvePackagedWorkspaceRoot();
-  return process.cwd();
+function resolveWorkspace() {
+  if (process.env.HISTORA_WORKSPACE) return { root: path.resolve(process.env.HISTORA_WORKSPACE), migrated: false };
+  if (process.env.CHATHUB_WORKSPACE) return { root: path.resolve(process.env.CHATHUB_WORKSPACE), migrated: false };
+  if (app.isPackaged) return resolvePackagedWorkspace();
+  return { root: process.cwd(), migrated: false };
 }
 
-function resolvePackagedWorkspaceRoot() {
+function resolvePackagedWorkspace() {
+  const root = managedWorkspaceRoot(app.getPath("userData"));
+  if (hasWorkspaceConfig(root)) return { root, migrated: false };
   const documents = app.getPath("documents");
   const candidates = [
     path.join(documents, "Chathub"),
     path.join(documents, "Histora")
   ];
-  for (const candidate of candidates) {
-    if (
-      fs.existsSync(path.join(candidate, CONFIG_FILE)) ||
-      fs.existsSync(path.join(candidate, LEGACY_CONFIG_FILE))
-    ) {
-      return candidate;
+  const legacyRoot = candidates.find(hasWorkspaceConfig);
+  return legacyRoot ? migrateWorkspace(legacyRoot, root) : { root, migrated: false };
+}
+
+function desktopSchedulerOptions() {
+  if (!app.isPackaged) return {};
+  return {
+    runner: {
+      programArguments: [app.getPath("exe"), "--histora-sync"]
     }
-  }
-  return candidates[0];
+  };
 }
 
 function ensureDesktopWorkspace(workspaceRoot) {
   ensureDir(workspaceRoot);
   const configPath = path.join(workspaceRoot, CONFIG_FILE);
   const legacyConfigPath = path.join(workspaceRoot, LEGACY_CONFIG_FILE);
-  if (fs.existsSync(configPath) || fs.existsSync(legacyConfigPath)) return;
-  fs.writeFileSync(configPath, renderConfig(defaultConfig(workspaceRoot)), "utf8");
+  if (fs.existsSync(legacyConfigPath)) return;
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, renderConfig(defaultConfig(workspaceRoot)), "utf8");
+    return;
+  }
+  const config = readConfig(workspaceRoot);
+  const existing = new Set(config.channels.map((channel) => channel.id));
+  const additions = defaultConfig(workspaceRoot).channels.filter((channel) => !existing.has(channel.id));
+  if (!additions.length) return;
+  fs.writeFileSync(configPath, renderConfig({ ...config, channels: [...config.channels, ...additions] }), "utf8");
 }
 
 function defaultConfig(workspaceRoot) {
@@ -218,6 +238,14 @@ function defaultConfig(workspaceRoot) {
         adapter: "claude-jsonl",
         source: "~/.claude/projects",
         enabled: true
+      },
+      {
+        id: "claude-desktop",
+        label: "Claude Desktop (Export)",
+        client: "Desktop export",
+        adapter: "claude-export-json",
+        source: "",
+        enabled: false
       },
       {
         id: "opencode",
@@ -250,6 +278,86 @@ function defaultConfig(workspaceRoot) {
         adapter: "hermes-sqlite",
         source: defaultHermesPath(),
         enabled: true
+      },
+      {
+        id: "grok-cli",
+        label: "Grok CLI",
+        client: "CLI",
+        adapter: "grok-jsonl",
+        source: defaultGrokCliPath(),
+        enabled: true
+      },
+      {
+        id: "accio-work",
+        label: "Accio Work",
+        client: "Desktop",
+        adapter: "accio-jsonl",
+        source: defaultAccioWorkPath(),
+        enabled: true
+      },
+      {
+        id: "workbuddy",
+        label: "WorkBuddy",
+        client: "Desktop",
+        adapter: "workbuddy-jsonl",
+        source: defaultWorkBuddyPath(),
+        enabled: true
+      },
+      {
+        id: "zcode",
+        label: "ZCode",
+        client: "Desktop/CLI",
+        adapter: "zcode-sqlite",
+        source: defaultZCodePath(),
+        enabled: true
+      },
+      {
+        id: "kimi-code",
+        label: "Kimi Code",
+        client: "CLI",
+        adapter: "kimi-jsonl",
+        source: defaultKimiCodePath(),
+        enabled: true
+      },
+      {
+        id: "mimo-code",
+        label: "Mimo Code",
+        client: "CLI",
+        adapter: "mimo-sqlite",
+        source: defaultMimoCodePath(),
+        enabled: true
+      },
+      {
+        id: "qoder-cli",
+        label: "Qoder CLI",
+        client: "CLI",
+        adapter: "qoder-jsonl",
+        source: defaultQoderCliPath(),
+        enabled: true
+      },
+      {
+        id: "qoder-work",
+        label: "Qoder Work",
+        client: "Desktop",
+        adapter: "qoderwork-sqlite",
+        source: defaultQoderWorkPath(),
+        enabled: true
+      },
+      {
+        id: "trae",
+        label: "Trae",
+        client: "Desktop",
+        adapter: "trae-vscode-json",
+        source: defaultTraePath(),
+        enabled: true
+      },
+      {
+        id: "minimax-cli",
+        label: "MiniMax CLI (Import)",
+        client: "CLI export",
+        adapter: "minimax-export-json",
+        source: "",
+        enabled: false
       }
     ]
   };
@@ -272,4 +380,40 @@ function defaultOpenClawPath() {
 
 function defaultHermesPath() {
   return "~/.hermes/state.db";
+}
+
+function defaultGrokCliPath() {
+  return "~/.grok/sessions";
+}
+
+function defaultAccioWorkPath() {
+  return "~/.accio/accounts";
+}
+
+function defaultWorkBuddyPath() {
+  return "~/.workbuddy";
+}
+
+function defaultZCodePath() {
+  return "~/.zcode/cli/db/db.sqlite";
+}
+
+function defaultKimiCodePath() {
+  return "~/.kimi-code/sessions";
+}
+
+function defaultMimoCodePath() {
+  return "~/.local/share/mimocode/mimocode.db";
+}
+
+function defaultQoderCliPath() {
+  return "~/.qoder/projects";
+}
+
+function defaultQoderWorkPath() {
+  return "~/Library/Application Support/QoderWork/data/agents.db";
+}
+
+function defaultTraePath() {
+  return "~/Library/Application Support/Trae CN";
 }

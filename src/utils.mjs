@@ -132,12 +132,24 @@ export function redactText(input) {
 
 export function extractTextContent(content) {
   if (typeof content === "string") return content;
+  if (content && typeof content === "object" && !Array.isArray(content)) {
+    if (typeof content.text === "string") return content.text;
+    if (typeof content.content === "string") return content.content;
+    if (Array.isArray(content.content)) return extractTextContent(content.content);
+    if (Array.isArray(content.parts)) return extractTextContent(content.parts);
+    return "";
+  }
   if (!Array.isArray(content)) return "";
   const pieces = [];
   for (const item of content) {
+    if (typeof item === "string") {
+      pieces.push(item);
+      continue;
+    }
     if (!item || typeof item !== "object") continue;
     if (typeof item.text === "string") pieces.push(item.text);
     else if (typeof item.content === "string") pieces.push(item.content);
+    else if (Array.isArray(item.content)) pieces.push(extractTextContent(item.content));
   }
   return pieces.join("\n\n").trim();
 }

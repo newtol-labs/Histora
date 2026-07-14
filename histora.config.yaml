@@ -20,6 +20,12 @@ channels:
     adapter: claude-jsonl
     source: ~/.claude/projects
     enabled: true
+  - id: claude-desktop
+    label: "Claude Desktop (Export)"
+    client: "Desktop export"
+    adapter: claude-export-json
+    source: ""
+    enabled: false
   - id: opencode
     label: OpenCode
     client: CLI
@@ -44,3 +50,63 @@ channels:
     adapter: hermes-sqlite
     source: ~/.hermes/state.db
     enabled: true
+  - id: grok-cli
+    label: "Grok CLI"
+    client: CLI
+    adapter: grok-jsonl
+    source: ~/.grok/sessions
+    enabled: true
+  - id: accio-work
+    label: "Accio Work"
+    client: Desktop
+    adapter: accio-jsonl
+    source: ~/.accio/accounts
+    enabled: true
+  - id: workbuddy
+    label: WorkBuddy
+    client: Desktop
+    adapter: workbuddy-jsonl
+    source: ~/.workbuddy
+    enabled: true
+  - id: zcode
+    label: ZCode
+    client: Desktop/CLI
+    adapter: zcode-sqlite
+    source: ~/.zcode/cli/db/db.sqlite
+    enabled: true
+  - id: kimi-code
+    label: "Kimi Code"
+    client: CLI
+    adapter: kimi-jsonl
+    source: ~/.kimi-code/sessions
+    enabled: true
+  - id: mimo-code
+    label: "Mimo Code"
+    client: CLI
+    adapter: mimo-sqlite
+    source: ~/.local/share/mimocode/mimocode.db
+    enabled: true
+  - id: qoder-cli
+    label: "Qoder CLI"
+    client: CLI
+    adapter: qoder-jsonl
+    source: ~/.qoder/projects
+    enabled: true
+  - id: qoder-work
+    label: "Qoder Work"
+    client: Desktop
+    adapter: qoderwork-sqlite
+    source: "~/Library/Application Support/QoderWork/data/agents.db"
+    enabled: true
+  - id: trae
+    label: Trae
+    client: Desktop
+    adapter: trae-vscode-json
+    source: "~/Library/Application Support/Trae CN"
+    enabled: true
+  - id: minimax-cli
+    label: "MiniMax CLI (Import)"
+    client: "CLI export"
+    adapter: minimax-export-json
+    source: ""
+    enabled: false

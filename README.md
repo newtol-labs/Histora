@@ -46,6 +46,8 @@ Saving the schedule from the GUI rewrites `histora.config.yaml` and reinstalls t
 
 On macOS, Histora installs a small watchdog script in `~/Library/Application Support/Histora/` and points `launchd` at that script. The watchdog keeps the workspace path in `HISTORA_WORKSPACE`, records launch/exit lines in `.histora/logs/launchd.out.log`, and stops a stuck sync after 10 minutes so the next scheduled run is not blocked.
 
+Packaged builds store Histora's workspace under `~/Library/Application Support/Histora/workspace`. On first launch, Histora migrates an existing `~/Documents/Chathub` or `~/Documents/Histora` workspace while preserving the original. Background sync refuses workspaces under Documents, Desktop, or Downloads, and only runs an installed app from Applications.
+
 ## CLI
 
 ```sh
@@ -75,8 +77,19 @@ Currently supported direct sources:
 - Claude Code: `~/.claude/projects`
 - OpenCode: `~/.local/share/opencode/opencode.db`
 - Hermes Agent: `~/.hermes/state.db`
+- Grok CLI: `~/.grok/sessions/*/{summary.json,updates.jsonl}`
+- Accio Work: `~/.accio/accounts/*/agents/*/sessions/*.messages.jsonl`
+- WorkBuddy: `~/.workbuddy/workbuddy.db` plus `~/.workbuddy/projects/**/*.jsonl`
+- ZCode: `~/.zcode/cli/db/db.sqlite`
+- Kimi Code: `~/.kimi-code/sessions/**/{state.json,agents/main/wire.jsonl}` (legacy `~/.kimi/sessions/` is also detectable)
+- Mimo Code: `~/.local/share/mimocode/mimocode.db`
+- Qoder CLI: `~/.qoder/projects/*/transcript/*.jsonl`
+- Qoder Work: `~/Library/Application Support/QoderWork/data/agents.db` (macOS)
+- Trae: VS Code-compatible `User/workspaceStorage/*/chatSessions/*.json` under Trae's Application Support folder (macOS)
 
 Supported export/import sources:
 
 - Gemini CLI: JSON or JSONL conversation export, or a configured sessions directory
 - OpenClaw: JSON or JSONL conversation export, or a configured sessions directory
+- Claude Desktop: exported JSON or JSONL conversation files (the desktop cache is intentionally not parsed)
+- MiniMax CLI: configured JSON or JSONL export files; the official `mmx` CLI does not currently expose a local session archive for automatic discovery

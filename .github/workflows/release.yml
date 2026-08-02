@@ -169,6 +169,14 @@ jobs:
           rm -f "$ZIP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
+          # electron-builder generated blockmaps for the unsigned artifacts.
+          # Rebuild them after repacking so differential updates describe the
+          # final signed DMG and ZIP instead of stale pre-signing bytes.
+          echo "→ Regenerating blockmaps"
+          BLOCKMAP_BUILDER=$(node -p "require('app-builder-bin').appBuilderPath")
+          "$BLOCKMAP_BUILDER" blockmap --input "$DMG" --output "$DMG.blockmap"
+          "$BLOCKMAP_BUILDER" blockmap --input "$ZIP" --output "$ZIP.blockmap"
+
           rm -rf "$WORK"
           echo "→ Regenerating latest-mac.yml with correct checksums"
           DMG_SIZE=$(stat -f%z "$DMG")

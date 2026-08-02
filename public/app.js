@@ -41,7 +41,7 @@ document.querySelectorAll(".nav-item").forEach((button) => {
 });
 
 els.syncNow.addEventListener("click", syncNow);
-els.openFolder.addEventListener("click", () => postJson("/api/open", {}));
+els.openFolder.addEventListener("click", () => openTarget("", els.openFolder));
 els.installLaunchd.addEventListener("click", installLaunchd);
 els.scheduleForm.addEventListener("submit", saveScheduleSettings);
 els.cadenceSelect.addEventListener("change", updateScheduleControls);
@@ -194,8 +194,20 @@ function renderSessions() {
   `).join("") || `<tr><td colspan="7" class="muted">还没有同步的会话 / No synced sessions yet.</td></tr>`;
 
   els.sessionsTable.querySelectorAll("[data-open]").forEach((button) => {
-    button.addEventListener("click", () => postJson("/api/open", { path: button.dataset.open }));
+    button.addEventListener("click", () => openTarget(button.dataset.open, button));
   });
+}
+
+async function openTarget(target, button) {
+  button.disabled = true;
+  try {
+    await postJson("/api/open", target ? { path: target } : {});
+    showToast("已打开 / Opened");
+  } catch (error) {
+    showToast(`无法打开 / Unable to open: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function sessionMatchesQuery(session, query) {
@@ -405,7 +417,7 @@ function setOptions(select, options) {
 
 async function getJson(url) {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw new Error(await responseError(response));
   return response.json();
 }
 
@@ -415,8 +427,17 @@ async function postJson(url, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw new Error(await responseError(response));
   return response.json();
+}
+
+async function responseError(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text).error || text;
+  } catch {
+    return text;
+  }
 }
 
 function showToast(message) {

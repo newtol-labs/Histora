@@ -9,16 +9,17 @@ import { listSessionStates } from "./state.mjs";
 import { getStatus, readLogs, runSync } from "./sync.mjs";
 
 export function createChathubServer(options = {}) {
-  const root = options.root || process.cwd();
+  const root = path.resolve(options.root || process.cwd());
   const publicDir = options.publicDir || path.join(root, "public");
   const updater = options.updater || null;
   const schedulerOptions = options.schedulerOptions || {};
+  const pathOpener = options.openPath || openSystemPath;
 
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname.startsWith("/api/")) {
-        await handleApi(req, res, url, root, updater, schedulerOptions);
+        await handleApi(req, res, url, root, updater, schedulerOptions, pathOpener);
         return;
       }
       serveStatic(res, url.pathname, publicDir);
@@ -47,7 +48,7 @@ export function startServer(options = {}) {
   });
 }
 
-async function handleApi(req, res, url, root, updater, schedulerOptions) {
+async function handleApi(req, res, url, root, updater, schedulerOptions, pathOpener) {
   if (req.method === "GET" && url.pathname === "/api/status") {
     sendJson(res, 200, getStatus(root));
     return;
@@ -130,8 +131,16 @@ async function handleApi(req, res, url, root, updater, schedulerOptions) {
 
   if (req.method === "POST" && url.pathname === "/api/open") {
     const body = await readBody(req);
-    const target = body.path || root;
-    openPath(target);
+    const requestedPath = typeof body.path === "string" ? body.path.trim() : "";
+    const target = path.resolve(requestedPath || root);
+    if (!fs.existsSync(target)) {
+      sendJson(res, 404, { error: `Path does not exist: ${target}` });
+      return;
+    }
+    const openError = await pathOpener(target);
+    if (typeof openError === "string" && openError.trim()) {
+      throw new Error(`Unable to open path: ${openError.trim()}`);
+    }
     sendJson(res, 200, { ok: true, path: target });
     return;
   }
@@ -160,16 +169,22 @@ function serveStatic(res, pathname, publicDir) {
   fs.createReadStream(fullPath).pipe(res);
 }
 
-function openPath(target) {
-  if (process.platform === "darwin") {
-    execFile("open", [target], () => {});
-    return;
-  }
-  if (process.platform === "win32") {
-    execFile("cmd", ["/c", "start", "", target], () => {});
-    return;
-  }
-  execFile("xdg-open", [target], () => {});
+function openSystemPath(target) {
+  const [command, args] = process.platform === "darwin"
+    ? ["open", [target]]
+    : process.platform === "win32"
+      ? ["cmd", ["/c", "start", "", target]]
+      : ["xdg-open", [target]];
+
+  return new Promise((resolve, reject) => {
+    execFile(command, args, (error) => {
+      if (error) {
+        reject(new Error(`Unable to open path: ${error.message}`));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 function sendJson(res, status, value) {

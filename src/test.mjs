@@ -20,6 +20,7 @@ import { detectAgents } from "./discovery.mjs";
 import { CONFIG_FILE, LEGACY_CONFIG_FILE, parseConfig, updateSyncConfig } from "./config.mjs";
 import { assertSafeBackgroundWorkspace, launchdRunner } from "./launchd.mjs";
 import { renderSessionMarkdown } from "./markdown.mjs";
+import { createChathubServer } from "./server.mjs";
 import { ensureState } from "./state.mjs";
 import { normalizeRecord } from "./sync.mjs";
 import { readConfig } from "./config.mjs";
@@ -579,6 +580,32 @@ channels: []
 );
 const detected = detectAgents({ channels: [{ id: "hermes-agent", source: hermesDb, adapter: "hermes-sqlite" }] });
 assert.ok(detected.some((agent) => agent.id === "hermes-agent"));
+
+const openTestRoot = fs.mkdtempSync(path.join(os.tmpdir(), "histora-open-"));
+const openTestServer = createChathubServer({
+  root: openTestRoot,
+  openPath: async (target) => {
+    assert.equal(target, openTestRoot);
+    return "test open failure";
+  }
+});
+await new Promise((resolve, reject) => {
+  openTestServer.once("error", reject);
+  openTestServer.listen(0, "127.0.0.1", resolve);
+});
+const openTestAddress = openTestServer.address();
+let openResponse;
+try {
+  openResponse = await fetch(`http://127.0.0.1:${openTestAddress.port}/api/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+} finally {
+  await new Promise((resolve) => openTestServer.close(resolve));
+}
+assert.equal(openResponse.status, 500);
+assert.match(await openResponse.text(), /test open failure/);
 
 console.log("ok");
 

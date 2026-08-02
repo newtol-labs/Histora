@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, shell } from "electron";
 import { defaultCodexHome } from "./codex-storage.mjs";
 import { CONFIG_FILE, LEGACY_CONFIG_FILE, readConfig, renderConfig } from "./config.mjs";
 import { installLaunchd, launchdPlistPath } from "./launchd.mjs";
@@ -57,7 +57,8 @@ if (isSyncOnly) {
       publicDir: path.join(app.getAppPath(), "public"),
       port: 0,
       updater,
-      schedulerOptions
+      schedulerOptions,
+      openPath: openDesktopPath
     });
 
     openMainWindow();
@@ -136,7 +137,7 @@ function setApplicationMenu(window, workspaceRoot, updater) {
       submenu: [
         {
           label: "Open Histora Folder / 打开 Histora 文件夹",
-          click: () => shell.openPath(workspaceRoot)
+          click: () => openDesktopPath(workspaceRoot).catch(showOpenError)
         },
         {
           label: "Reload / 重新载入",
@@ -166,6 +167,18 @@ function setApplicationMenu(window, workspaceRoot, updater) {
     }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+async function openDesktopPath(target) {
+  const error = await shell.openPath(target);
+  if (error) throw new Error(error);
+}
+
+function showOpenError(error) {
+  dialog.showErrorBox(
+    "无法打开 / Unable to Open",
+    error?.message || String(error)
+  );
 }
 
 function resolveWorkspace() {

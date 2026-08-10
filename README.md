@@ -48,6 +48,27 @@ On macOS, Histora installs a small watchdog script in `~/Library/Application Sup
 
 Packaged builds store Histora's workspace under `~/Library/Application Support/Histora/workspace`. On first launch, Histora migrates an existing `~/Documents/Chathub` or `~/Documents/Histora` workspace while preserving the original. Background sync refuses workspaces under Documents, Desktop, or Downloads, and only runs an installed app from Applications.
 
+## Local HTTP API
+
+The development server listens on `127.0.0.1:4767` by default. Override the
+bind address with `HISTORA_HOST` and `HISTORA_PORT`; the legacy aliases
+`CHATHUB_HOST` and `CHATHUB_PORT` are still accepted.
+
+The desktop GUI uses these local endpoints, including:
+
+- `GET /api/status` — current workspace, channels, sessions, and last run.
+- `POST /api/sync` — run an immediate sync.
+- `POST /api/open` — open the workspace, or an existing file path supplied as
+  `{ "path": "/absolute/path" }`.
+- `GET /api/sessions` — list indexed sessions with optional `channel`, `project`,
+  and `limit` query parameters.
+
+`/api/open` waits for the operating-system opener. Missing paths return `404`
+and opener failures return `500`; the GUI surfaces both as a toast instead of
+silently reporting success. The server is intended for loopback use and has no
+authentication, so do not bind it to a public interface without adding an
+appropriate access-control layer.
+
 ## CLI
 
 ```sh
@@ -56,6 +77,15 @@ npm run status
 npm run doctor
 npm run install-launchd
 ```
+
+## Release
+
+Pushing a `v*` tag starts `.github/workflows/release.yml`, which builds macOS
+DMG/ZIP and Windows installer/portable artifacts and publishes a GitHub
+Release. The macOS package is not Apple-notarized by default; on first launch,
+use Finder's **Open** action if Gatekeeper blocks the app. The release workflow
+re-signs the macOS bundle and regenerates blockmaps after repacking so updater
+metadata matches the final artifacts.
 
 ## Output
 

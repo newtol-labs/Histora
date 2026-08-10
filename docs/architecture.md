@@ -30,6 +30,10 @@ desktop-only integrations.
 - `src/desktop-main.mjs` creates the Electron window, resolves/migrates the
   packaged workspace, wires the updater, and passes Electron's opener into the
   server.
+- `build/icon.png` is the transparent branding master; `build/icon.icns` is
+  the macOS package icon, and `public/assets/histora-logo.png` is the 512px
+  sidebar rendition. Replacing the sidebar asset also requires changing its
+  cache key in `public/index.html`.
 - `src/sync.mjs`, `src/discovery.mjs`, and `src/adapters/` discover source data,
   normalize records, render Markdown, and update `.histora/state.sqlite`.
 - `src/launchd.mjs` renders macOS launchd or Windows Task Scheduler entries and

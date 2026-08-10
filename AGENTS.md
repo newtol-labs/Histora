@@ -24,6 +24,10 @@ needed. Build output belongs in the ignored `release/` directory.
   normalization, Markdown output, and SQLite state.
 - `public/` is a browser client of the local API; it must not depend on Node or
   Electron globals.
+- Keep brand assets synchronized: `build/icon.png` is the master,
+  `build/icon.icns` ships the macOS app icon, and
+  `public/assets/histora-logo.png` ships the sidebar logo. When replacing the
+  sidebar asset, refresh its cache key in `public/index.html`.
 - `/api/open` must wait for the opener result and return a non-2xx response on
   failure. Packaged Electron uses `shell.openPath`; the standalone server uses
   the platform opener.

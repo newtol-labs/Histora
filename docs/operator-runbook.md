@@ -55,7 +55,7 @@ npm run dist:mac     # macOS DMG + ZIP
 npm run dist:win     # Windows NSIS + portable
 ```
 
-Push a version tag such as `v0.10.3` to run the GitHub release workflow. The
+Push a version tag such as `v<version>` to run the GitHub release workflow. The
 macOS job re-signs the generated bundle, repairs Electron ASAR integrity,
 rebuilds DMG/ZIP blockmaps, and publishes the final assets. The package is not
 Apple-notarized by default; use Finder's **Open** action on the first launch if

@@ -2,8 +2,12 @@
 
 ## Verified state — 2026-08-10
 
-- Release `v0.10.3` is published at
-  `https://github.com/newtol-labs/Histora/releases/tag/v0.10.3`.
+- Release `v0.10.5` is published at
+  `https://github.com/newtol-labs/Histora/releases/tag/v0.10.5`; it contains
+  the H/synchronization logo for both the application bundle and sidebar.
+- The source uses sidebar color `#2a3a56` so the dark rounded logo tile remains
+  distinct; versioned releases package this visual adjustment for installed
+  apps.
 - The folder/file open flow waits for the actual desktop opener, validates the
   target path, and surfaces failures through the local API and GUI toast.
 - The release workflow builds macOS and Windows artifacts, re-signs the macOS
@@ -16,8 +20,10 @@
   isolated workspace and returned `200`.
 - DMG checksum verification, ZIP extraction, deep code-signature verification,
   and Electron ASAR integrity checks pass for the local macOS artifact.
-- GitHub Actions run `30752088455` completed successfully for Windows, macOS,
+- GitHub Actions run `31370022457` completed successfully for Windows, macOS,
   and the publish job.
+- The current local macOS smoke package contains the sidebar color and the
+  cache-busted H/synchronization sidebar asset.
 
 ## Constraints for the next change
 
